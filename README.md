@@ -11,7 +11,7 @@ Each position has its own guided tutorial, scoring and debrief. The radio is spo
 
 ## Play
 
-Open `index.html` in a browser. That is the whole game.
+Play online at https://mtran-wq.github.io/Atc-simulator/, or open `index.html` in a browser. That is the whole game.
 
 ## What is simulated
 
