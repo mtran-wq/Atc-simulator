@@ -39,6 +39,7 @@ Play online at https://mtran-wq.github.io/Atc-simulator/, or open `index.html` i
 - Ground: drag from an aircraft to a holding point or stand to taxi it there
 - Pinch or scroll to zoom, drag to pan; time compression 1x to 8x
 - Approach also takes typed commands on a keyboard, for example `MRX482 H 270 A 40 S 210`, `D EKKON`, `I 27R`, `TO`
+- Voice commands (approach): hold **MIC**, or hold `T` on a keyboard, and speak the clearance, for example "Meridian 482, turn left heading 270, descend and maintain 4,000" or "Nova 1203, direct EKKON". A quick tap on MIC listens until you stop talking. The page shows what it heard and the command it sent. Needs Chrome, Edge or Safari; in Chrome the audio is transcribed by Google's servers
 - SND opens the sound and speech settings
 
 ## Layout
@@ -47,6 +48,7 @@ Play online at https://mtran-wq.github.io/Atc-simulator/, or open `index.html` i
 src/page.html     markup and styles for both positions
 src/approach.js   approach radar simulation, its tutorial, and the shared briefing
 src/voice.js      spoken radio: phraseology conversion, speech queue, radio effects, settings
+src/listen.js     voice commands: push to talk and spoken phraseology to typed commands
 src/ground.js     ground simulation and its tutorial
 build.sh          concatenates src/ into dist/meridian-approach.html and index.html
 tests/            headless browser checks
@@ -64,9 +66,10 @@ npx playwright install chromium
 npm test
 ```
 
-They cover a scripted landing and departure, both tutorials clicked through end to end, an automated ground controller run for 45 simulated minutes, and the audio settings. They check logic and that nothing throws; they cannot hear the audio.
+They cover a scripted landing and departure, both tutorials clicked through end to end, an automated ground controller run for 45 simulated minutes, the audio settings, and the voice command parser with push to talk. They check logic and that nothing throws; they cannot hear the audio.
 
 ## Known limits
 
 - Speech depends on the voices the device provides. Some in-app web views provide none.
+- Voice commands use the browser's speech recognition, which Firefox does not have. Fix names are matched by sound, so an unusual pronunciation can miss; spelling the fix in the phonetic alphabet always works.
 - The two positions run as separate shifts with independent traffic.

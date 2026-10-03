@@ -7,7 +7,7 @@ cd "$(dirname "$0")"
 mkdir -p dist
 {
   cat src/page.html
-  for f in src/approach.js src/voice.js src/ground.js; do
+  for f in src/approach.js src/voice.js src/listen.js src/ground.js; do
     echo '<script>'; cat "$f"; echo '</script>'
   done
 } > dist/meridian-approach.html

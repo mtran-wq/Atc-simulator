@@ -803,7 +803,9 @@ $('bHelp').onclick = () => { if (S.over) return showOv('debrief'); if (S.started
 /* ---------- briefing / debrief ---------- */
 const cfg = { traffic: 1, weather: 1, pos: 0, gwx: 1 };
 try { cfg.pos = localStorage.getItem('meridian.pos') === '1' ? 1 : 0; } catch (e) {}
-const MER = window.MER = { cfg, mode: 'app', ac: () => AC, beep: (f, d, v) => beep(f, d, v), snd: () => sndOn, toggleSnd: () => { sndOn = !sndOn; return sndOn; },
+const MER = window.MER = { cfg, mode: 'app', ac: () => AC,
+  live: () => S.started && !S.over, callsigns: () => S.ac.map(a => a.cs), sys: t => sys(t), fixes: Object.keys(FIX), runways: Object.keys(RW),
+  command(str) { if (!S.started || S.over) return; runCli(str); updUI(); }, beep: (f, d, v) => beep(f, d, v), snd: () => sndOn, toggleSnd: () => { sndOn = !sndOn; return sndOn; },
   audio() { try { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); if (AC.state === 'suspended') AC.resume(); } catch (er) {} },
   enterGround() { MER.mode = 'gnd'; $('app').hidden = true; $('gapp').hidden = false; $('ov').hidden = true; },
   toBrief() { MER.mode = 'app'; $('gapp').hidden = true; $('app').hidden = false; initShift({ traffic: cfg.traffic, weather: cfg.weather }); showOv('brief'); resize(); updUI(); } };
@@ -816,7 +818,8 @@ const HOWTO = `<ol>
 <li>The wind shifts. A tailwind over 10 kt forces go-arounds, so change the runway flow in time.</li>
 </ol>
 <p>Tap a target or strip to select. Drag from a target to turn it, or drop on a fix for direct. Set heading, altitude and speed with the steppers, then SEND. Pinch or scroll to zoom.</p>
-<p class="keys">Typed commands: <kbd>MRX482 H 270 A 40 S 210</kbd> <kbd>L 090</kbd> <kbd>D EKKON</kbd> <kbd>I 27R</kbd> <kbd>HOLD NIVEK</kbd> <kbd>LU</kbd> <kbd>TO</kbd> <kbd>GA</kbd> <kbd>X</kbd>. <kbd>Space</kbd> pauses, <kbd>/</kbd> focuses the command line.</p>`;
+<p>Or talk: hold <b>MIC</b> and say it as a controller would, for example &ldquo;Meridian 482, turn left heading 270, descend and maintain 4,000&rdquo;.</p>
+<p class="keys">Typed commands: <kbd>MRX482 H 270 A 40 S 210</kbd> <kbd>L 090</kbd> <kbd>D EKKON</kbd> <kbd>I 27R</kbd> <kbd>HOLD NIVEK</kbd> <kbd>LU</kbd> <kbd>TO</kbd> <kbd>GA</kbd> <kbd>X</kbd>. Hold <kbd>T</kbd> or <b>MIC</b> to give them by voice. <kbd>Space</kbd> pauses, <kbd>/</kbd> focuses the command line.</p>`;
 function seg(name, labels) { return `<div class="seg" data-seg="${name}">${labels.map((l, i) => `<button data-i="${i}" aria-pressed="${cfg[name] === i}">${l}</button>`).join('')}</div>`; }
 function showOv(mode) {
   if (MER.hush) MER.hush();

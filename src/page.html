@@ -46,6 +46,11 @@ button[aria-pressed="true"]{background:var(--ink);color:var(--scope);border-colo
 .alerts{position:absolute;top:8px;left:16px;right:140px;display:flex;flex-wrap:wrap;gap:4px;pointer-events:none}
 .alerts span{font-family:var(--f-mono);font-size:11px;padding:3px 6px;border-radius:2px;background:var(--alert);color:#1a0503;font-weight:700}
 .alerts span.w{background:var(--warn);color:#1f1200}
+.rail .mic{touch-action:none;-webkit-touch-callout:none}
+.rail .mic[aria-pressed=true]{background:var(--alert);border-color:var(--alert);color:#1a0503;font-weight:700}
+.heard{position:absolute;top:40px;left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100% - 32px);z-index:4;font-family:var(--f-mono);font-size:12px;line-height:1.45;padding:6px 10px;background:rgba(11,29,38,.94);border:1px solid var(--line);border-left:3px solid var(--dim);pointer-events:none;overflow-wrap:anywhere}
+.heard .lbl{color:var(--alert);font-weight:700;margin-right:4px}
+.heard.live{border-left-color:var(--alert)} .heard.ok{border-left-color:var(--ok)} .heard.ok b{color:var(--ok)} .heard.err{border-left-color:var(--warn)}
 .zoom{position:absolute;right:12px;top:8px;display:flex;gap:4px}
 .zoom button{width:36px;min-height:36px;padding:0;font-size:16px;background:rgba(11,29,38,.85)}
 .ticker{position:absolute;left:16px;right:16px;bottom:8px;font-family:var(--f-mono);font-size:11px;line-height:1.35;color:var(--ink);background:rgba(6,19,26,.78);padding:4px 8px;border-left:2px solid var(--dim);pointer-events:none;max-height:3.2em;overflow:hidden}
@@ -171,6 +176,7 @@ kbd{font-family:var(--f-mono);font-size:11px;border:1px solid var(--line);paddin
       <span class="grow"></span>
       <button id="bPause" title="Pause or resume" aria-label="Pause or resume">II</button>
       <button id="bRate" title="Time compression" aria-label="Time compression">2x</button>
+      <button id="bMic" class="mic" title="Hold to talk (or hold T)" aria-label="Push to talk" aria-pressed="false">MIC</button>
       <button id="bSnd" title="Sound and speech settings" aria-label="Sound and speech settings">SND</button>
       <button id="bHelp" title="Briefing and shift menu" aria-label="Briefing and shift menu">?</button>
     </div>
@@ -179,6 +185,7 @@ kbd{font-family:var(--f-mono);font-size:11px;border:1px solid var(--line);paddin
   <main id="scopeWrap" class="scopeWrap">
     <canvas id="scope" class="scope" aria-label="Radar scope"></canvas>
     <div id="alerts" class="alerts" aria-live="polite"></div>
+    <div id="heard" class="heard" aria-live="polite" hidden></div>
     <div id="zoom" class="zoom">
       <button id="zIn" aria-label="Zoom in">+</button>
       <button id="zOut" aria-label="Zoom out">&minus;</button>
