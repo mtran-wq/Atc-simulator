@@ -1,0 +1,27 @@
+const { chromium } = require('playwright');
+(async () => {
+  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }).catch(()=>chromium.launch());
+  const errs = []; const p = await b.newPage({ viewport: {width:390,height:780}, deviceScaleFactor: 2 });
+  p.setDefaultTimeout(8000);
+  p.on('pageerror', e => errs.push(e.message));
+  await p.goto('file://' + require('path').resolve(__dirname, '..', 'index.html')); await p.waitForTimeout(400);
+  await p.click('[data-seg=pos] [data-i="1"]'); await p.click('[data-act=g-start]'); await p.waitForTimeout(300);
+  await p.evaluate(() => { const G = window.__gnd; G.S.paused = true; for (let i = 0; i < 40; i++) G.step(0.25); });
+  await p.waitForTimeout(300); await p.click('#gStrips .strip.ready'); await p.waitForTimeout(250);
+  console.log('hint:', await p.$eval('#gHint', e => e.textContent));
+  await p.click('#gPushE'); await p.evaluate(() => { const G = window.__gnd; for (let i = 0; i < 4 * 95; i++) G.step(0.25); }); await p.waitForTimeout(300);
+  console.log('stat:', await p.$eval('#gStat', e => e.textContent));
+  await p.click('#gTaxi'); await p.waitForTimeout(300); await p.screenshot({ path: 'gsheet.png' });
+  console.log('dests:', await p.$$eval('#gShBody button', e => e.map(x => x.textContent + (x.disabled ? ' [x]' : '')).slice(0, 8)));
+  await p.click('#gShBody button:not([disabled])'); await p.waitForTimeout(250);
+  console.log('hint:', await p.$eval('#gHint', e => e.textContent));
+  const r = await p.evaluate(() => { const G = window.__gnd, S = G.S; const a = S.ac.find(x => x.id === S.sel); let n = 0; while (a.st !== 'short' && n++ < 4000) G.step(0.25); return { st: a.st, t: Math.round(S.t), arrs: S.ac.filter(x => x.kind === 'arr').map(x => x.cs + ':' + x.st) }; });
+  console.log(JSON.stringify(r)); await p.waitForTimeout(300);
+  console.log('hint:', await p.$eval('#gHint', e => e.textContent));
+  await p.click('#gTo'); const r2 = await p.evaluate(() => { const G = window.__gnd, S = G.S; for (let i = 0; i < 4 * 120; i++) G.step(0.25); return { stats: S.stats, score: S.score, log: S.log.slice(-6).map(l => l.text) }; });
+  console.log(JSON.stringify(r2));
+  await p.click('#gHelp'); await p.waitForTimeout(200); await p.click('[data-act=g-end]'); await p.waitForTimeout(200); await p.click('[data-act=g-new]'); await p.waitForTimeout(300);
+  console.log('back to brief:', await p.$eval('#ovCard h1', e => e.textContent), 'gapp hidden', await p.$eval('#gapp', e => e.hidden), 'app hidden', await p.$eval('#app', e => e.hidden));
+  await p.click('[data-seg=pos] [data-i="0"]'); await p.waitForTimeout(200); console.log('h1', await p.$eval('#ovCard h1', e => e.textContent), await p.$$eval('.cta button', e => e.map(x => x.textContent)));
+  console.log('errors', errs); await b.close();
+})().catch(e => { console.log('FAIL', e.message.slice(0, 300)); process.exit(1); });

@@ -1,0 +1,12 @@
+{
+  "name": "meridian-approach",
+  "private": true,
+  "description": "Air traffic control simulation with an approach radar position and a ground position",
+  "scripts": {
+    "build": "./build.sh",
+    "test": "./build.sh && for t in tests/*.js; do echo \"== $t\"; node \"$t\" || exit 1; done"
+  },
+  "devDependencies": {
+    "playwright": "^1.50.0"
+  }
+}

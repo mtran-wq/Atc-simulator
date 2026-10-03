@@ -1,0 +1,37 @@
+const { chromium } = require('playwright');
+(async () => {
+  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }).catch(()=>chromium.launch());
+  const errs = []; const p = await b.newPage({ viewport: {width:390,height:780}, deviceScaleFactor: 2 });
+  p.setDefaultTimeout(8000);
+  p.on('pageerror', e => errs.push(e.message + ' ' + (e.stack || '').split('\n')[1]));
+  await p.goto('file://' + require('path').resolve(__dirname, '..', 'index.html')); await p.waitForTimeout(400);
+  const samples = ['MRX482, turn left heading 270, descend and maintain 4,000, cleared ILS runway 27R approach.', 'Meridian Approach, N482KT, C208, level 9,000 inbound KODEL with A.', 'SKL32, wind 280/11, runway 09L, cleared for takeoff.', 'TRK294, taxi to holding point A5, runway 27R via E, D, A, A5.', 'NVA826, B763, on final runway 27L, 2:30 out.', 'Ground, MRX2227, clear of runway 27R on A2, request stand.', 'PCF12, taxi to stand G10 via A, C, F.', 'Unable 120, minimum speed 160, MRX482.', 'MRX1, unable from here, we need full length and have 2,600 m.', 'MAYDAY MAYDAY MAYDAY, MRX482, fuel emergency, 5 minutes remaining.', 'N512KT, taxi to stand K2 via B, D, A, A4, K4, K.'];
+  console.log((await p.evaluate(s => s.map(window.MER._toSpeech), samples)).join('\n'));
+  console.log('speech support', await p.evaluate(() => ({ syn: 'speechSynthesis' in window, on: window.MER.speechOn() })));
+  await p.click('[data-seg=pos] [data-i="1"]'); await p.waitForTimeout(150);
+  console.log('cta', await p.$$eval('.cta button', e => e.map(x => x.textContent)));
+  await p.click('[data-act=g-tut]'); await p.waitForTimeout(400);
+  const ti = () => p.evaluate(() => window.__gnd.S.tut.i), w = () => p.waitForTimeout(320);
+  const run = (cond) => p.evaluate(async c => { const G = window.__gnd, S = G.S; let n = 0; const want = S.tut.i; while (S.tut.i === want && n++ < 6000) { G.step(0.25); if (n % 20 === 0) await new Promise(r => requestAnimationFrame(r)); } await new Promise(r => setTimeout(r, 350)); return { i: S.tut.i, t: Math.round(S.t) }; });
+  await p.click('#gStrips .strip.tut-hl'); await w(); console.log('1 select', await ti());
+  console.log('hl', await p.$$eval('.tut-hl', e => e.map(x => x.id || x.className)));
+  await p.click('#gPushE'); await w(); console.log('2 push', await ti(), JSON.stringify(await run()));
+  await p.click('#gTaxi'); await w(); console.log('sheet hl', await p.$$eval('#gShBody .tut-hl', e => e.map(x => x.dataset.v)));
+  await p.screenshot({ path: 'gtut.png' });
+  await p.click('#gShBody [data-v="hA5"]'); await w(); console.log('4 taxi', await ti(), JSON.stringify(await run()));
+  await p.click('#gStrips .strip.tut-hl'); await w(); await p.click('#gTaxi'); await w(); await p.click('#gShBody button:not([disabled])'); await w(); console.log('7 stand', await ti(), JSON.stringify(await run()));
+  await p.click('#gStrips .strip.tut-hl'); await w(); await p.click('#gTo'); await w(); console.log('10 takeoff', await ti(), JSON.stringify(await run()));
+  await p.click('#gStrips .strip.tut-hl'); await w(); await p.click('#gTaxi'); await w();
+  console.log('cargo dests', await p.$$eval('#gShBody button', e => e.map(x => x.textContent)));
+  await p.click('#gShBody button:not([disabled])'); await w(); console.log('13 cargo taxi', await ti(), JSON.stringify(await run()));
+  await p.click('#gCross'); await w(); console.log('15 cross', await ti(), JSON.stringify(await run()));
+  console.log('last', await ti(), await p.$eval('#gcoNext', e => e.textContent), JSON.stringify(await p.evaluate(() => window.__gnd.S.stats)));
+  // audio card
+  await p.click('#gSnd'); await w(); console.log('audio h1', await p.$eval('#ovCard h1', e => e.textContent), await p.$$eval('#ovCard .vseg', e => e.map(s => [...s.querySelectorAll('button')].filter(b => b.getAttribute('aria-pressed') === 'true').map(b => b.textContent).join())));
+  await p.screenshot({ path: 'audio.png' });
+  await p.click('.vseg[data-k=mode] [data-i="2"]'); await p.click('[data-act=v-rate][data-d="1"]'); await p.click('[data-act=v-test]'); await w();
+  console.log('saved', await p.evaluate(() => localStorage.getItem('meridian.voice')));
+  await p.click('[data-act=v-close]'); await w(); console.log('ov hidden', await p.$eval('#ov', e => e.hidden), 'hold', await p.evaluate(() => window.MER.hold));
+  await p.click('#gcoNext'); await w(); console.log('after', await p.$eval('#ovCard h1', e => e.textContent), await p.$$eval('.cta button', e => e.map(x => x.textContent)));
+  console.log('errors', errs); await b.close();
+})().catch(e => { console.log('FAIL', e.message.slice(0, 400)); process.exit(1); });
