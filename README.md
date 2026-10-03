@@ -39,7 +39,9 @@ Play online at https://mtran-wq.github.io/Atc-simulator/, or open `index.html` i
 - Ground: drag from an aircraft to a holding point or stand to taxi it there
 - Pinch or scroll to zoom, drag to pan; time compression 1x to 8x
 - Approach also takes typed commands on a keyboard, for example `MRX482 H 270 A 40 S 210`, `D EKKON`, `I 27R`, `TO`
-- Voice commands (approach): hold **MIC**, or hold `T` on a keyboard, and speak the clearance, for example "Meridian 482, turn left heading 270, descend and maintain 4,000" or "Nova 1203, direct EKKON". A quick tap on MIC listens until you stop talking. The page shows what it heard and the command it sent. Needs Chrome, Edge or Safari; in Chrome the audio is transcribed by Google's servers
+- Voice commands, on both positions: hold **MIC**, or hold `T` on a keyboard, and speak the clearance. A quick tap on MIC listens until you stop talking. The page shows what it heard and what it did with it. Needs Chrome, Edge or Safari; in Chrome the audio is transcribed by Google's servers
+  - Approach: "Meridian 482, turn left heading 270, descend and maintain 4,000", "Nova 1203, direct EKKON", "cleared ILS runway 27 right"
+  - Ground: "push and start approved, face west", "taxi to holding point alpha 2", "taxi to runway 27 right" (picks the nearest holding point that is long enough), "taxi to stand golf 3", "cargo stand 2", "hold position", "continue taxi", "other route", "turn round", "cross runway", "line up and wait", "cleared for takeoff"
 - SND opens the sound and speech settings
 
 ## Layout
@@ -48,7 +50,7 @@ Play online at https://mtran-wq.github.io/Atc-simulator/, or open `index.html` i
 src/page.html     markup and styles for both positions
 src/approach.js   approach radar simulation, its tutorial, and the shared briefing
 src/voice.js      spoken radio: phraseology conversion, speech queue, radio effects, settings
-src/listen.js     voice commands: push to talk and spoken phraseology to typed commands
+src/listen.js     voice commands: push to talk, and spoken phraseology to approach typed commands or ground clearances
 src/ground.js     ground simulation and its tutorial
 build.sh          concatenates src/ into dist/meridian-approach.html and index.html
 tests/            headless browser checks

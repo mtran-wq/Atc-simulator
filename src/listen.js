@@ -20,6 +20,7 @@ function tokenize(text) {
     .replace(/\bx-ray\b/g, 'xray').replace(/\btake-?off\b/g, 'takeoff').replace(/\bgo-around\b/g, 'go around')
     .replace(/\b(trans) (cargo)\b/g, '$1$2').replace(/\b(sky) (lark)\b/g, '$1$2')
     .replace(/\b(\d{1,2})([lrc])\b/g, '$1 $2')                  // 27R
+    .replace(/\b([a-z])(\d{1,2})\b/g, '$1 $2')                   // G3, A2
     .replace(/[.,;:!?]/g, ' | ').replace(/[^a-z0-9| ]+/g, ' ');
   const w = s.split(/\s+/).filter(Boolean), out = [];
   for (let i = 0; i < w.length; i++) {
@@ -80,11 +81,11 @@ function readRwy(tk, i) {
   return { err: `Unknown runway ${num}${s}.`, used: s ? 2 : 1 };
 }
 
-/* ---------- a transmission to a typed command ---------- */
-function parse(text, callsigns) {
-  const tk = tokenize(text), out = [], used = new Set();
+/* ---------- the callsign: airline name + number, November + number + two letters, or written as MRX482 ---------- */
+const FILL = new Set(['and', 'to', 'maintain', 'at', 'the', 'your', 'turn', 'fly', 'proceed', 'cleared', 'for', 'please', 'now', 'immediately']);
+function readCall(text, callsigns, extraFill) {
+  const tk = tokenize(text), used = new Set();
   let cs = null, spokenCs = null, err = null;
-  /* callsign: airline name + number, November + number + two letters, or written as MRX482 */
   for (let i = 0; i < tk.length && !spokenCs; i++) {
     const t = tk[i];
     if (typeof t !== 'string') continue;
@@ -104,8 +105,14 @@ function parse(text, callsigns) {
     }
   }
   const W = i => (used.has(i) ? null : tk[i]);
-  const FILL = new Set(['and', 'to', 'maintain', 'at', 'the', 'your', 'turn', 'fly', 'proceed', 'cleared', 'for', 'please', 'now', 'immediately']);
-  const skip = (i, extra) => { while (i < tk.length && typeof W(i) === 'string' && (FILL.has(W(i)) || (extra && extra.includes(W(i))))) i++; return i; };
+  const skip = (i, extra) => { while (i < tk.length && typeof W(i) === 'string' && (FILL.has(W(i)) || (extraFill && extraFill.includes(W(i))) || (extra && extra.includes(W(i))))) i++; return i; };
+  return { tk, cs, spokenCs, err, W, skip };
+}
+
+/* ---------- approach: a transmission to a typed command ---------- */
+function parse(text, callsigns) {
+  const o = readCall(text, callsigns), { tk, cs, spokenCs, W, skip } = o, out = [];
+  let err = o.err;
   for (let i = 0; i < tk.length; i++) {
     const t = W(i); if (typeof t !== 'string') continue;
     if ((t === 'left' || t === 'right') && !(isNum(W(i - 1)))) {
@@ -145,19 +152,63 @@ function parse(text, callsigns) {
 }
 MER.parseSpeech = parse;
 
+/* ---------- ground: a transmission to a clearance for MER.gnd.run ---------- */
+const SPOT = { a: 'A', alpha: 'A', alfa: 'A', b: 'B', bravo: 'B', g: 'G', golf: 'G', gulf: 'G', k: 'K', kilo: 'K' };
+function parseGround(text, callsigns) {
+  const o = readCall(text, callsigns), { tk, cs, spokenCs, W, skip } = o, c = {};
+  let err = o.err, taxi = false, rwy = null;
+  const spot = i => (SPOT[W(i)] && isNum(W(i + 1)) ? SPOT[W(i)] + +W(i + 1).n : null);
+  for (let i = 0; i < tk.length; i++) {
+    const t = W(i); if (typeof t !== 'string') continue;
+    if (t === 'push' || t === 'pushback' || t === 'pushing' || t === 'face' || t === 'facing') {
+      let j = i + 1; while (j < Math.min(tk.length, i + 9) && W(j) !== 'east' && W(j) !== 'west' && W(j) !== 'taxi') j++;
+      if (W(j) === 'east' || W(j) === 'west') { c.push = W(j) === 'east' ? 'E' : 'W'; i = j; } else if (!c.push) err = err || 'Push facing east or west?';
+    } else if (t === 'taxi') taxi = true;
+    else if (t === 'stand' || t === 'gate' || t === 'parking' || t === 'cargo') {
+      const j = skip(i + 1, ['stand', 'gate', 'parking', 'cargo', 'apron', 'position']), sp = spot(j);
+      if (sp) { c.stand = sp; i = j + 1; } else if (isNum(W(j))) { c.stand = (t === 'cargo' ? 'K' : 'G') + +W(j).n; i = j; }
+    } else if (t === 'holding' && W(i + 1) === 'point') {
+      const j = skip(i + 2), sp = spot(j); if (sp) { c.hp = sp; i = j + 1; } else err = err || 'Which holding point?';
+    } else if (t === 'hold') {
+      if (W(i + 1) === 'short') i++; else { c.holdPos = true; if (W(i + 1) === 'position') i++; }
+    } else if (t === 'continue') c.holdPos = false;
+    else if (['other', 'alternative', 'alternate', 'different', 'another'].includes(t) && W(i + 1) === 'route') { c.altRoute = true; i++; }
+    else if ((t === 'turn' && (W(i + 1) === 'round' || W(i + 1) === 'around')) || t === 'tug') { c.turn = true; if (t === 'turn') i++; }
+    else if (t === 'cross') c.cross = true;
+    else if (t === 'line' && W(i + 1) === 'up') { c.luaw = true; i = skip(i + 2, ['wait']) - 1; }
+    else if (t === 'takeoff' || (t === 'take' && W(i + 1) === 'off')) { c.takeoff = true; if (t === 'take') i++; }
+    else if (t === 'runway') { if (isNum(W(i + 1))) { const r = readRwy(tk, i + 1); if (r.id) rwy = r.id; i += r.used; } }
+    else if (t === 'on' && spot(i + 1)) i += 2;   // "cross on A2": where it is, not where it goes
+    else if (spot(i) && !c.stand && !c.hp && !c.spot) { c.spot = spot(i); i++; }
+  }
+  const dest = c.stand || c.hp || c.spot;
+  if (taxi && !dest && rwy && !c.luaw && !c.takeoff && !c.cross) c.rwy = rwy;
+  if (taxi && !dest && !c.rwy) err = err || 'Taxi to where? Give a stand, a holding point or a runway.';
+  if (c.luaw && c.takeoff) delete c.luaw;
+  const parts = [];
+  if (c.push) parts.push(`PUSH FACE ${c.push === 'E' ? 'EAST' : 'WEST'}`);
+  if (c.stand) parts.push(`TAXI STAND ${c.stand}`); if (c.hp) parts.push(`TAXI HOLDING POINT ${c.hp}`); if (c.spot) parts.push(`TAXI ${c.spot}`); if (c.rwy) parts.push(`TAXI RWY ${c.rwy}`);
+  if (c.altRoute) parts.push('OTHER ROUTE'); if (c.holdPos === true) parts.push('HOLD POSITION'); if (c.holdPos === false) parts.push('CONTINUE TAXI');
+  if (c.turn) parts.push('TURN ROUND'); if (c.cross) parts.push('CROSS'); if (c.luaw) parts.push('LINE UP'); if (c.takeoff) parts.push('TAKEOFF');
+  return { cs, spokenCs, c, line: parts.join(' · '), err, score: (cs ? 2 : 0) + parts.length - (err ? 1 : 0) };
+}
+MER.parseGroundSpeech = parseGround;
+
 /* ---------- push to talk ---------- */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;
 let rec = null, on = false, holding = false, finals = [], interim = '', quietT = 0, hideT = 0, failed = '';
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const gnd = () => MER.mode === 'gnd';
 function show(html, cls, ms) {
-  const el = $('heard'); if (!el) return;
+  const el = $(gnd() ? 'gHeard' : 'heard'), other = $(gnd() ? 'heard' : 'gHeard'); if (other) other.hidden = true; if (!el) return;
   clearTimeout(hideT); el.className = 'heard ' + (cls || ''); el.innerHTML = html; el.hidden = false;
   if (ms) hideT = setTimeout(() => { el.hidden = true; }, ms);
 }
-function setBtn() { const b = $('bMic'); if (b) b.setAttribute('aria-pressed', on ? 'true' : 'false'); }
+const hide = () => { ['heard', 'gHeard'].forEach(id => { if ($(id)) $(id).hidden = true; }); };
+function setBtn() { ['bMic', 'gMic'].forEach(id => { const b = $(id); if (b) b.setAttribute('aria-pressed', on ? 'true' : 'false'); }); }
 function quiet(ms) { clearTimeout(quietT); if (!holding) quietT = setTimeout(stop, ms); }
 function start(hold) {
-  if (!MER.live || !MER.live()) return show('Start a shift first, then hold MIC to talk.', 'err', 3000);
+  if (!(gnd() ? MER.gnd && MER.gnd.live() : MER.live && MER.live())) return show('Start a shift first, then hold MIC to talk.', 'err', 3000);
   if (!SR) return show('Voice commands need Chrome, Edge or Safari. Firefox has no speech recognition.', 'err', 5000);
   holding = !!hold; if (on) return;
   if (MER.audio) MER.audio(); if (MER.hush) MER.hush();
@@ -182,19 +233,24 @@ function finish() {
   const texts = [];
   for (let k = 0; k < 3; k++) { const t = finals.map(f => f[k] || f[0]).join(' ').trim(); if (t && !texts.includes(t)) texts.push(t); }
   if (!texts.length && interim.trim()) texts.push(interim.trim());
-  if (!texts.length) return failed ? show(esc(failed), 'err', 4000) : $('heard') && ($('heard').hidden = true);
-  const cands = texts.map(t => ({ t, r: parse(t, MER.callsigns ? MER.callsigns() : []) })).sort((a, b) => b.r.score - a.r.score), { t, r } = cands[0];
-  const said = `&ldquo;${esc(t)}&rdquo;`;
-  if (r.err && !r.cmd) return show(`${said}<br>${esc(r.err)}`, 'err', 5000);
-  if (r.spokenCs && !r.cs) return show(`${said}<br>${esc(r.err)}`, 'err', 5000);
-  if (!r.cmd && !r.cs) return show(`${said}<br>No instruction recognised. Try &ldquo;Meridian 482, turn left heading 270&rdquo;.`, 'err', 5000);
-  const line = ((r.cs || '') + ' ' + r.cmd).trim();
+  if (!texts.length) return failed ? show(esc(failed), 'err', 4000) : hide();
+  const g = gnd(), list = g ? (MER.gnd ? MER.gnd.callsigns() : []) : MER.callsigns ? MER.callsigns() : [];
+  const cands = texts.map(t => ({ t, r: (g ? parseGround : parse)(t, list) })).sort((a, b) => b.r.score - a.r.score), { t, r } = cands[0];
+  const said = `&ldquo;${esc(t)}&rdquo;`, what = g ? r.line : r.cmd;
+  if ((r.err && !what) || (r.spokenCs && !r.cs)) return show(`${said}<br>${esc(r.err)}`, 'err', 5000);
+  if (!what && !r.cs) return show(`${said}<br>No instruction recognised. Try &ldquo;${g ? 'Meridian 482, push and start approved, face west' : 'Meridian 482, turn left heading 270'}&rdquo;.`, 'err', 5000);
+  const line = ((r.cs || '') + ' ' + what).trim();
+  if (g) {
+    const no = MER.gnd.run(r.cs, r.c);
+    show(`${said}<br>&rarr; <b>${esc(line)}</b>${no || r.err ? '<br>' + esc(no || r.err) : ''}`, no ? 'err' : 'ok', no ? 5000 : 4000);
+    return;
+  }
   show(`${said}<br>&rarr; <b>${esc(line)}</b>${r.err ? ' &middot; ' + esc(r.err) : ''}`, 'ok', 4000);
   if (MER.command) MER.command(line);
 }
 
-const b = $('bMic');
-if (b) {
+['bMic', 'gMic'].forEach(id => {
+  const b = $(id); if (!b) return;
   let downT = 0;
   b.addEventListener('pointerdown', e => {
     e.preventDefault(); downT = performance.now(); try { b.setPointerCapture(e.pointerId); } catch (er) {}
@@ -204,11 +260,11 @@ if (b) {
   const up = () => { if (!downT) return; const held = performance.now() - downT; downT = 0; if (!on) return; if (held > 400) stop(); else { holding = false; quiet(6000); } };
   b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up);
   b.addEventListener('contextmenu', e => e.preventDefault());
-}
+});
 /* hold T to talk on a keyboard */
 document.addEventListener('keydown', e => {
   if (e.key !== 't' && e.key !== 'T') return; if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
-  if (MER.mode !== 'app' || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+  if ((MER.mode !== 'app' && MER.mode !== 'gnd') || !$('ov').hidden || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
   e.preventDefault(); start(true);
 });
 document.addEventListener('keyup', e => { if ((e.key === 't' || e.key === 'T') && holding) stop(); });

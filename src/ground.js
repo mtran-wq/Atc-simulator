@@ -691,7 +691,8 @@ MER.gHow = `<ol>
 <li>Taxiways A, B, C and D are two-way. The apron lanes E, F and K are single file: aircraft wait outside rather than meet head on, so keep each lane flowing one way with your push directions and routes. If two do end up nose to nose, a tug can turn one round.</li>
 <li>Leave two minutes after a heavy before sending a lighter type off the same runway.</li>
 </ol>
-<p>Tap an aircraft or strip to select it; a green ring means it is waiting for you. Drag from an aircraft to a holding point or a stand to taxi it there. Pinch or scroll to zoom.</p>`;
+<p>Tap an aircraft or strip to select it; a green ring means it is waiting for you. Drag from an aircraft to a holding point or a stand to taxi it there. Pinch or scroll to zoom.</p>
+<p>Or talk: hold <b>MIC</b> (or <kbd>T</kbd>) and say it, for example &ldquo;Meridian 482, push and start approved, face west&rdquo;, &ldquo;taxi to holding point alpha 2&rdquo;, &ldquo;taxi to stand golf 3&rdquo;, &ldquo;cross runway 27 right&rdquo;, &ldquo;cleared for takeoff&rdquo;.</p>`;
 function showOv(mode) {
   if (MER.hush) MER.hush();
   const card = $('ovCard'); $('ov').hidden = false; let h;
@@ -810,5 +811,55 @@ function frame(now) {
   draw(); if (now - uiT > 200) { uiT = now; updUI(); }
 }
 new ResizeObserver(resize).observe(wrap);
+
+/* ---------- voice commands (src/listen.js turns the speech into c) ---------- */
+function voiceDest(a, c) {
+  let stand = c.stand, hp = c.hp;
+  if (c.spot) { if (a.kind === 'arr') stand = c.spot; else hp = c.spot; }
+  if (stand) {
+    if (a.kind !== 'arr') return { err: `${a.cs} is a departure: give it a holding point.` };
+    if (!N[stand] || N[stand].t !== 'gate') return { err: `There is no stand ${stand}.` };
+    if (!gateFits(stand, a)) return { err: `Stand ${stand} does not suit ${a.cs}: ${a.cargo && N[stand].cat !== 'C' ? 'it parks on the cargo apron, K1 to K4' : !a.cargo && N[stand].cat === 'C' ? 'the K stands are for cargo and light aircraft' : 'heavies need G1, G5, G6, G10, K1 or K4'}.` };
+    if (!gateFree(stand, a)) return { err: `Stand ${stand} is occupied.` };
+    return { id: stand };
+  }
+  if (hp) {
+    if (a.kind === 'arr') return { err: `${a.cs} has landed: give it a stand.` };
+    const id = 'h' + hp; if (!N[id] || N[id].t !== 'hs') return { err: `There is no holding point ${hp}.` };
+    return { id };
+  }
+  if (c.rwy) {
+    if (a.kind === 'arr') return { err: `${a.cs} has landed: give it a stand.` };
+    const rw = ['N', 'S'].find(r => rwName(r) === c.rwy);
+    if (!rw) return { err: `Runway ${c.rwy} is not in use. Runways ${S.flow === 'W' ? '27L and 27R' : '09L and 09R'} are.` };
+    const d = destsFor(a).find(x => x.ok && !x.bad && N[x.id].rwy === rw);
+    return d ? { id: d.id } : { err: `No holding point on ${c.rwy} is long enough for ${a.cs}.` };
+  }
+  return null;
+}
+MER.gnd = {
+  live: () => !!S && S.started && !S.over,
+  callsigns: () => S.ac.map(a => a.cs),
+  run(cs, c) {   // returns '' once the clearance has gone out, or why it could not
+    const a = cs ? S.ac.find(x => x.cs === cs) : selAc();
+    if (!a) return 'No aircraft selected. Start with the callsign.';
+    if (cs) select(a.id);
+    let err = '';
+    const no = t => { err = err || t; };
+    if (c.push) { if (a.st !== 'pushreq') no(`${a.cs} is not waiting for pushback.`); else cmd(a, { push: c.push }); }
+    const d = voiceDest(a, c);
+    if (d) {
+      if (d.err) no(d.err);
+      else if (!['taxireq', 'taxi', 'short', 'vacated'].includes(a.st)) no(`${a.cs} is not ready to taxi.`);
+      else cmd(a, { taxi: d.id });
+    }
+    if (c.altRoute) { if (a.st !== 'taxi' || !a.dest) no(`${a.cs} is not taxiing.`); else cmd(a, { altRoute: true }); }
+    if (c.holdPos != null) { if (a.st !== 'taxi') no(`${a.cs} is not taxiing.`); else if (!!a.hold !== c.holdPos) cmd(a, { hold: true }); }
+    if (c.turn) { if (a.st !== 'taxi') no(`${a.cs} is not taxiing.`); else cmd(a, { turn: true }); }
+    if (c.cross) { if (a.st !== 'taxi' || !a.wantCross) no(`${a.cs} is not waiting to cross a runway.`); else cmd(a, { cross: true }); }
+    if (c.luaw || c.takeoff) { if (a.st !== 'short' && !(c.takeoff && a.st === 'lineup')) no(`${a.cs} is not holding short of a runway.`); else cmd(a, { luaw: !!c.luaw && !c.takeoff, takeoff: !!c.takeoff }); }
+    updUI(); return err;
+  },
+};
 window.__gnd = { get S() { return S; }, N, cmd, step, select, routes, path };
 })();

@@ -242,6 +242,7 @@ kbd{font-family:var(--f-mono);font-size:11px;border:1px solid var(--line);paddin
       <span class="grow"></span>
       <button id="gPause" title="Pause or resume" aria-label="Pause or resume">II</button>
       <button id="gRate" title="Time compression" aria-label="Time compression">2x</button>
+      <button id="gMic" class="mic" title="Hold to talk (or hold T)" aria-label="Push to talk" aria-pressed="false">MIC</button>
       <button id="gSnd" title="Sound and speech settings" aria-label="Sound and speech settings">SND</button>
       <button id="gHelp" title="Briefing and shift menu" aria-label="Briefing and shift menu">?</button>
     </div>
@@ -249,6 +250,7 @@ kbd{font-family:var(--f-mono);font-size:11px;border:1px solid var(--line);paddin
   <main id="gWrap" class="scopeWrap">
     <canvas id="gScope" class="scope" aria-label="Airport surface map"></canvas>
     <div id="gAlerts" class="alerts" aria-live="polite"></div>
+    <div id="gHeard" class="heard" aria-live="polite" hidden></div>
     <div class="zoom">
       <button id="gzIn" aria-label="Zoom in">+</button>
       <button id="gzOut" aria-label="Zoom out">&minus;</button>
